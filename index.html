@@ -166,16 +166,31 @@
 
     function listen() {
       listeningEnabled = true;
+
+      // 🔓 Unlock audio playback (Chrome requirement)
+      const unlock = new Audio();
+      unlock.src = "data:audio/mp3;base64,//uQxA";
+      unlock.play().catch(() => { });
+
       startRecognition();
       document.getElementById("output").innerText = "🎙️ Listening...";
     }
 
+
     function startRecognition() {
-      if (!recognitionActive) {
-        recognition.start();
-        recognitionActive = true;
-      }
+      if (recognitionActive) return;
+      recognition.start();
+      recognitionActive = true;
     }
+
+
+    function speak(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1;
+      utterance.pitch = 0.9;
+      speechSynthesis.speak(utterance);
+    }
+
 
     recognition.onresult = async (event) => {
       recognitionActive = false;
@@ -213,25 +228,39 @@
     };
 
     function playBackendAudio(data) {
+      console.log("Backend response:", data);
+
       document.getElementById("output").innerText = data.answer;
 
-      if (data.audio_url) {
-        const audio = new Audio(
-          "https://api.9mech.in" + data.audio_url
-        );
-
-        audio.onended = () => {
-          setTimeout(startRecognition, 400);
-        };
-
-        audio.play().catch(err => {
-          console.error("Audio play failed", err);
-          speak(data.answer); // fallback
-        });
-      } else {
+      if (!data.audio_url) {
+        console.warn("No audio_url, falling back to TTS");
         speak(data.answer);
+        return;
       }
+
+      const audioUrl = "https://api.9mech.in" + data.audio_url;
+      console.log("Playing audio:", audioUrl);
+
+      const audio = new Audio(audioUrl);
+      audio.preload = "auto";
+
+      audio.oncanplaythrough = () => {
+        audio.play().catch(err => {
+          console.error("Audio play blocked:", err);
+          speak(data.answer);
+        });
+      };
+
+      audio.onerror = (e) => {
+        console.error("Audio load error:", e);
+        speak(data.answer);
+      };
+
+      audio.onended = () => {
+        setTimeout(startRecognition, 400);
+      };
     }
+
 
   </script>
 
