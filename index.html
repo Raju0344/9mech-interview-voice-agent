@@ -151,11 +151,36 @@
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    // ... all your existing JS code ...
+    if (!SpeechRecognition) {
+      document.getElementById("output").innerText =
+        "Speech recognition works best in Google Chrome.";
+      throw new Error("SpeechRecognition not supported");
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+
+    let recognitionActive = false;
+    let listeningEnabled = false;
+
+    function listen() {
+      listeningEnabled = true;
+      startRecognition();
+      document.getElementById("output").innerText = "🎙️ Listening...";
+    }
+
+    function startRecognition() {
+      if (!recognitionActive) {
+        recognition.start();
+        recognitionActive = true;
+      }
+    }
 
     recognition.onresult = async (event) => {
       recognitionActive = false;
       const question = event.results[0][0].transcript;
+
       document.getElementById("output").innerText = "🤔 Thinking...";
 
       try {
@@ -166,15 +191,26 @@
         });
 
         const data = await res.json();
-        playBackendAudio(data);   // ✅ call it here
+        playBackendAudio(data);
 
-      } catch {
+      } catch (err) {
         document.getElementById("output").innerText =
           "⚠️ Backend error. Please retry.";
+        console.error(err);
       }
     };
 
-    // 🔽 PASTE THE FUNCTION RIGHT HERE 🔽
+    recognition.onerror = () => {
+      recognitionActive = false;
+      if (listeningEnabled) {
+        setTimeout(startRecognition, 600);
+      }
+    };
+
+    recognition.onend = () => {
+      recognitionActive = false;
+    };
+
     function playBackendAudio(data) {
       document.getElementById("output").innerText = data.answer;
 
@@ -184,15 +220,16 @@
         );
 
         audio.onended = () => {
-          setTimeout(startRecognition, 400);
+          if (listeningEnabled) {
+            setTimeout(startRecognition, 500);
+          }
         };
 
         audio.play();
-      } else {
-        speak(data.answer); // fallback
       }
     }
   </script>
+
 
 </body>
 
