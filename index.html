@@ -151,50 +151,7 @@
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      document.getElementById("output").innerText =
-        "Speech recognition works best in Google Chrome.";
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-
-    let listeningEnabled = false;
-    let recognitionActive = false;
-    let maleVoice = null;
-
-    function loadVoices() {
-      const voices = speechSynthesis.getVoices();
-      maleVoice =
-        voices.find(v =>
-          v.lang.startsWith("en") &&
-          (
-            v.name.toLowerCase().includes("male") ||
-            v.name.toLowerCase().includes("alex") ||
-            v.name.toLowerCase().includes("daniel") ||
-            v.name.toLowerCase().includes("fred")
-          )
-        ) || voices.find(v => v.lang.startsWith("en"));
-    }
-
-    speechSynthesis.onvoiceschanged = loadVoices;
-    loadVoices();
-
-    function listen() {
-      if (!listeningEnabled) {
-        listeningEnabled = true;
-        startRecognition();
-        document.getElementById("output").innerText = "🎙️ Listening...";
-      }
-    }
-
-    function startRecognition() {
-      if (!recognitionActive) {
-        recognition.start();
-        recognitionActive = true;
-      }
-    }
+    // ... all your existing JS code ...
 
     recognition.onresult = async (event) => {
       recognitionActive = false;
@@ -202,40 +159,41 @@
       document.getElementById("output").innerText = "🤔 Thinking...";
 
       try {
-        const res = await fetch("/ask", {
+        const res = await fetch("http://13.233.115.72:8000/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question })
         });
 
         const data = await res.json();
-        speak(data.answer);
+        playBackendAudio(data);   // ✅ call it here
+
       } catch {
         document.getElementById("output").innerText =
           "⚠️ Backend error. Please retry.";
       }
     };
 
-    recognition.onerror = () => {
-      recognitionActive = false;
-      document.getElementById("output").innerText =
-        "⚠️ Could not hear clearly.";
-    };
+    // 🔽 PASTE THE FUNCTION RIGHT HERE 🔽
+    function playBackendAudio(data) {
+      document.getElementById("output").innerText = data.answer;
 
-    function speak(text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      if (maleVoice) utterance.voice = maleVoice;
-      utterance.rate = 1;
-      utterance.pitch = 0.9;
+      if (data.audio_url) {
+        const audio = new Audio(
+          "http://13.233.115.72:8000" + data.audio_url
+        );
 
-      utterance.onend = () => {
-        setTimeout(startRecognition, 300);
-      };
+        audio.onended = () => {
+          setTimeout(startRecognition, 400);
+        };
 
-      document.getElementById("output").innerText = text;
-      speechSynthesis.speak(utterance);
+        audio.play();
+      } else {
+        speak(data.answer); // fallback
+      }
     }
   </script>
+
 </body>
 
 </html>
